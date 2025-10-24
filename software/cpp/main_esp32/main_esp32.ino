@@ -8,10 +8,12 @@ TaskHandle_t TaskIMUHandle;
 // ===== Zustände & Variablen =====
 bool motor_enabled = false;
 volatile bool motor_done = false;
+volatile bool read_imu = false;
+volatile bool start_calib = false;
 int transitionSpeed = 10000;
-float dt = 0.05;
-int stillstands = 10;
-float degreeZ = 60.0;
+float dt = 0.05; // Default: 2s
+int stillstands = 4; // Default: 10
+float degreeZ = 90; // Default: 60.0
 int rotation_count = 0;
 float beschleunigung = 20000.0;
 
@@ -68,14 +70,16 @@ void starte_kinematik_setup() {
 }
 
 // ===== Bewegung in Stillstandspositionen =====
-void fahre_stillstandspositionen_ab(int stillstands, bool dir1High, bool dir2High) {
+void fahre_stillstandspositionen_ab(bool dir1High, bool dir2High) {
   float deg = 360.0 / stillstands;
   float rotation = deg / 360.0;
   float winkelgeschwindigkeit = deg / dt;
   stepper_1_2.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit));
 
   for (int i = 0; i < stillstands; i++) {
+    disableMotor();
     vTaskDelay(dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
+    enableMotor();
 
     digitalWrite(DIR_PIN_1, dir1High ? HIGH : LOW);
     digitalWrite(DIR_PIN_2, dir2High ? HIGH : LOW);
@@ -92,10 +96,12 @@ void fahre_stillstandspositionen_ab(int stillstands, bool dir1High, bool dir2Hig
 
 void disableMotor() {
   digitalWrite(ENABLE_PIN, HIGH);
+  motor_enabled = false;
 }
 
 void enableMotor() {
   digitalWrite(ENABLE_PIN, LOW);
+  motor_enabled = true;;
 }
 
 
@@ -187,14 +193,34 @@ void readDataIMU() {
   }
 }
 
+
+// ===== Task: Pyserial =====
+void TaskPySerial(void *pvParameters) {
+  for (;;) {
+    if (Serial.available()) {
+      String cmd = Serial.readStringUntil('\n');
+      // Signale
+      if (cmd == "Start Raw Read") { Serial.println("Signal received."); read_imu = true; }
+      else if (cmd == "Stop Raw Read") { Serial.println("Signal received."); read_imu = false; }
+      else if (cmd == "Start Calibration") { Serial.println("Signal received."); start_calib = true; }
+      else if (cmd == "stop motor") {
+        motor_enabled = false;
+        disableMotor();
+      }
+    }
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+  }
+}
+
 // ===== Task: IMU =====
 void TaskReadIMU(void *pvParameters) {
   for (;;) {
-    if (!motor_done) {
+    if (read_imu) {
       readDataIMU();
-      vTaskDelay(10 / portTICK_PERIOD_MS);
-    } else {
-      vTaskDelay(100 / portTICK_PERIOD_MS);
+      vTaskDelay(1 / portTICK_PERIOD_MS);
+    }
+    else {
+      vTaskDelay(50 / portTICK_PERIOD_MS);   // kurze Ruhepause
     }
   }
 }
@@ -203,40 +229,49 @@ void TaskReadIMU(void *pvParameters) {
 void TaskMotor(void *pvParameters) {
   motor_done = false;
   for (;;) {
-    if (!motor_enabled) {
-      if (millis() - t0 >= startDelayMs) {
-        digitalWrite(ENABLE_PIN, LOW);
-        motor_enabled = true;
-      } else {
-        vTaskDelay(10 / portTICK_PERIOD_MS);
-        continue;
+    if (start_calib) {
+      if (!motor_enabled) {
+        if (millis() - t0 >= startDelayMs) {
+          enableMotor();
+        } else {
+          vTaskDelay(10 / portTICK_PERIOD_MS);
+          continue;
+        }
       }
-    }
-    if (rotation_count % 2 == 0) {
-      fahre_stillstandspositionen_ab(10, HIGH, LOW);
-      transitionZ(HIGH, HIGH);   // Z-Übergang
-      rotation_count++;
-    } else {
-      fahre_stillstandspositionen_ab(10, LOW, HIGH);
-      transitionZ(HIGH, HIGH);
-      rotation_count++;
-    }
+      read_imu = true;
+      if (rotation_count % 2 == 0) {
+        fahre_stillstandspositionen_ab(HIGH, LOW);
+        transitionZ(HIGH, HIGH);   // Z-Übergang
+        rotation_count++;
+      } else {
+        fahre_stillstandspositionen_ab(LOW, HIGH);
+        transitionZ(HIGH, HIGH);
+        rotation_count++;
+      }
 
-    if (rotation_count >= (int)(360.0 / degreeZ)) {
-      motor_done = true;
-      transition(2.0, LOW, LOW);
-      disableMotor();
-      Serial.println("Motor fertig!");
-      vTaskDelete(NULL); // TaskMotor beenden
-    }
+      if (rotation_count >= (int)(360.0 / degreeZ)) {
+        motor_done = true;
+        start_calib = false;
+        read_imu = false;
+        rotation_count = 0;
+        transition(2.0, LOW, LOW);
+        disableMotor();
+        Serial.println("Calibration Done.");
+        vTaskDelay(1000 / portTICK_PERIOD_MS); 
+      }
 
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+      vTaskDelay(1 / portTICK_PERIOD_MS);
+    }
+    else {
+      vTaskDelay(50 / portTICK_PERIOD_MS);
+    }
   }
 }
 
 // ===== Setup =====
 void setup() {
   Serial.begin(115200);
+  delay(6000);
   starte_kinematik_setup();
   Wire.begin(21, 22);
   Wire.setClock(400000);
@@ -246,6 +281,8 @@ void setup() {
 
   xTaskCreatePinnedToCore(TaskReadIMU, "TaskIMU", 8192, NULL, 2, &TaskIMUHandle, 0);
   xTaskCreatePinnedToCore(TaskMotor, "TaskMotor", 8192, NULL, 2, &TaskMotorHandle, 1);
+  xTaskCreatePinnedToCore(TaskPySerial, "TaskSerial", 4096, NULL, 1, NULL, 0);
+
 }
 
 void loop() {}
