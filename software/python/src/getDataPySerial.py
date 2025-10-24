@@ -1,76 +1,41 @@
-import os
-import sys
-import serial
-import pandas as pd
+import os, time, serial, pandas as pd
 
-# === Pfade ===
-# os.path.abspath(__file__)      → absoluter Pfad zur Datei
-# os.path.dirname(path)          → Verzeichnisname vom Pfad
-# os.path.join(a, b, ...)        → Pfade zusammenbauen
+# Basis: Ordner, in dem das aktuelle Skript liegt
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "../../..", "data")  # ../data relativ zu src/
+CSV = os.path.join(DATA_DIR, "data.csv")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__)) # aktueller Ordner
-GIT_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "..", "..")) # teststand-imu Ordner
-DATA_DIR = os.path.join(GIT_DIR, "data") # data Ordner
-CSV_ACCEL = os.path.join(DATA_DIR, "imu_accel_data.csv") # CSV für Accel-Daten
-CSV_GYRO = os.path.join(DATA_DIR, "imu_gyro_data.csv") # CSV für Gyro-Daten
+PORT = "/dev/ttyUSB0"
+BAUD = 115200
 
-
-# === Einstellungen anpassen ===
-PORT = "COM4"
-BAUDRATE = 115200
-
-# === Verbindung herstellen ===
-ser = serial.Serial(PORT, BAUDRATE, timeout=1) # IDE Code wird nochmal ausgeführt
+ser = serial.Serial(PORT, BAUD, timeout=1)
+time.sleep(2)
 
 print("Fange an Daten zu sammeln...")
+ser.write(b"Start Calibration\n")
 
-# Leere Daten Listen
-data_accel = []
-data_gyro = []
+rows = []
+t0 = time.time()
 
-#=== Accel-Daten sammeln ===
-while True:
-    try:
-        line = ser.readline().decode("utf-8").strip() # Lese die Serial
-        if not line: # Wenn keine Daten, nächste Iteration
+try:
+    while True:
+        line = ser.readline().decode("utf-8", errors="ignore").strip()
+        if not line:
             continue
-        # Header-Zeile überspringen
-        if line.startswith("id"):  
-            continue
-        
-        parts = line.split(",")
-        
-        if not "," in line:
-            print(line)
-
-        # Accel Data
-        if len(parts) == 8:
-            id, i, ax, ay, az, gx, gy, gz = parts
-            data_accel.append([id, int(i),int(ax), int(ay), int(az), int(gx), int(gy), int(gz)])
-        
-        
-        # Gyro Data
-        if len(parts) == 6:
-            id, i, axis, gyro_raw, gyro_dps, w = parts
-            data_gyro.append([id, i, axis, gyro_raw, gyro_dps, w])
-
-        # Messung Stoppen
-        if line == "CALIBRATION DONE":
+        if "Calibration Done" in line:
+            print("Kalibrierung beendet, speichere Daten...")
             break
 
-    except KeyboardInterrupt:
-        print("Manuell gestoppt")
-        break
+        parts = line.split(",")
+        if len(parts) == 6:
+            ax, ay, az, gx, gy, gz = map(float, parts)
+            rows.append([ax, ay, az, gx, gy, gz])
+            print(parts)
+except KeyboardInterrupt:
+    print("Manuell gestoppt")
 
-ser.close()
-
-# === In DataFrame speichern ===
-# Accel Data
-df_accel = pd.DataFrame(data_accel, columns=["id","i","ax","ay","az","gx","gy","gz"])
-df_accel.to_csv(CSV_ACCEL, index= False)
-# Gyro Data
-df_gyro = pd.DataFrame(data_gyro, columns=["id","i","axis","gyro_raw", "gyro_dps", "w"])
-df_gyro.to_csv(CSV_GYRO, index = False)
-
-print(f"{len(df_accel)} Zeilen gespeichert in {CSV_ACCEL}")
-print(f"{len(df_gyro)} Zeilen gespeichert in {CSV_GYRO}")
+# Datei speichern
+os.makedirs(DATA_DIR, exist_ok=True)
+df = pd.DataFrame(rows, columns=["ax","ay","az","gx","gy","gz"])
+df.to_csv(CSV, index=False)
+print(f"{len(df)} Zeilen gespeichert in {CSV}")
