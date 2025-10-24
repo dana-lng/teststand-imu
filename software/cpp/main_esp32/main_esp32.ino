@@ -11,8 +11,8 @@ volatile bool motor_done = false;
 volatile bool read_imu = false;
 volatile bool start_calib = false;
 int transitionSpeed = 10000;
-float dt = 0.05; // Default: 2s
-int stillstands = 4; // Default: 10
+float dt = 2; // Default: 2s
+int stillstands = 5; // Default: 10
 float degreeZ = 90; // Default: 60.0
 int rotation_count = 0;
 float beschleunigung = 20000.0;
@@ -177,6 +177,7 @@ void readDataIMU() {
   Wire.endTransmission(false);
   Wire.requestFrom(MPU, 14, true);
   if (Wire.available() == 14) {
+    uint32_t t_us = micros();            // <-- Zeitstempel JETZT nehmen
     int16_t ax = (Wire.read() << 8) | Wire.read();
     int16_t ay = (Wire.read() << 8) | Wire.read();
     int16_t az = (Wire.read() << 8) | Wire.read();
@@ -189,7 +190,8 @@ void readDataIMU() {
     Serial.print((float)az * MPUscaleFactorAccMS2, 5); Serial.print(",");
     Serial.print((float)wx / MPUscaleFactorGyroRADS, 5); Serial.print(",");
     Serial.print((float)wy / MPUscaleFactorGyroRADS, 5); Serial.print(",");
-    Serial.println((float)wz / MPUscaleFactorGyroRADS, 5);
+    Serial.println((float)wz / MPUscaleFactorGyroRADS, 5); Serial.print(",");
+    Serial.println(t_us);                 // <-- Zeitstempel anhängen
   }
 }
 
@@ -203,10 +205,6 @@ void TaskPySerial(void *pvParameters) {
       if (cmd == "Start Raw Read") { Serial.println("Signal received."); read_imu = true; }
       else if (cmd == "Stop Raw Read") { Serial.println("Signal received."); read_imu = false; }
       else if (cmd == "Start Calibration") { Serial.println("Signal received."); start_calib = true; }
-      else if (cmd == "stop motor") {
-        motor_enabled = false;
-        disableMotor();
-      }
     }
     vTaskDelay(10 / portTICK_PERIOD_MS);
   }
@@ -241,18 +239,24 @@ void TaskMotor(void *pvParameters) {
       read_imu = true;
       if (rotation_count % 2 == 0) {
         fahre_stillstandspositionen_ab(HIGH, LOW);
+        read_imu = false;
+        vTaskDelay(50 / portTICK_PERIOD_MS);
         transitionZ(HIGH, HIGH);   // Z-Übergang
         rotation_count++;
       } else {
         fahre_stillstandspositionen_ab(LOW, HIGH);
+        read_imu = false;
+        vTaskDelay(50 / portTICK_PERIOD_MS);
         transitionZ(HIGH, HIGH);
         rotation_count++;
       }
 
       if (rotation_count >= (int)(360.0 / degreeZ)) {
+        read_imu = true;
+        vTaskDelay(dt * 1000 / portTICK_PERIOD_MS); 
+        read_imu = false;
         motor_done = true;
         start_calib = false;
-        read_imu = false;
         rotation_count = 0;
         transition(2.0, LOW, LOW);
         disableMotor();
