@@ -11,9 +11,9 @@ volatile bool motor_done = false;
 volatile bool read_imu = false;
 volatile bool start_calib = false;
 int transitionSpeed = 10000;
-float dt = 2; // Default: 2s
+float dt = 5; // Default: 2s
 int stillstands = 5; // Default: 10
-float degreeZ = 90; // Default: 60.0
+float degreeZ = 45; // Default: 60.0
 int rotation_count = 0;
 float beschleunigung = 20000.0;
 
@@ -177,7 +177,6 @@ void readDataIMU() {
   Wire.endTransmission(false);
   Wire.requestFrom(MPU, 14, true);
   if (Wire.available() == 14) {
-    uint32_t t_us = micros();            // <-- Zeitstempel JETZT nehmen
     int16_t ax = (Wire.read() << 8) | Wire.read();
     int16_t ay = (Wire.read() << 8) | Wire.read();
     int16_t az = (Wire.read() << 8) | Wire.read();
@@ -190,8 +189,7 @@ void readDataIMU() {
     Serial.print((float)az * MPUscaleFactorAccMS2, 5); Serial.print(",");
     Serial.print((float)wx / MPUscaleFactorGyroRADS, 5); Serial.print(",");
     Serial.print((float)wy / MPUscaleFactorGyroRADS, 5); Serial.print(",");
-    Serial.println((float)wz / MPUscaleFactorGyroRADS, 5); Serial.print(",");
-    Serial.println(t_us);                 // <-- Zeitstempel anhängen
+    Serial.println((float)wz / MPUscaleFactorGyroRADS, 5);
   }
 }
 
@@ -212,13 +210,16 @@ void TaskPySerial(void *pvParameters) {
 
 // ===== Task: IMU =====
 void TaskReadIMU(void *pvParameters) {
+  const TickType_t period = pdMS_TO_TICKS(10); // 100 Hz
+  TickType_t lastWake = xTaskGetTickCount();
+
   for (;;) {
     if (read_imu) {
       readDataIMU();
-      vTaskDelay(1 / portTICK_PERIOD_MS);
-    }
-    else {
-      vTaskDelay(50 / portTICK_PERIOD_MS);   // kurze Ruhepause
+      vTaskDelayUntil(&lastWake, period); // <-- absoluter Takt, konstante Rate
+    } else {
+      vTaskDelay(pdMS_TO_TICKS(50));
+      lastWake = xTaskGetTickCount();     // Takt resetten wenn pausiert
     }
   }
 }
