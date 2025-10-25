@@ -11,16 +11,16 @@ volatile bool motor_done = false;
 volatile bool read_imu = false;
 volatile bool start_calib = false;
 int transitionSpeed = 10000;
-float dt = 5; // Default: 2s
-int stillstands = 5; // Default: 10
-float degreeZ = 45; // Default: 45.0
+float dt = 1; // Default: 2s
+int stillstands = 1; // Default: 10
+float degreeZ = 180; // Default: 45.0
 int rotation_count = 0;
-float beschleunigung = 20000.0;
+float beschleunigung = 5000.0;
 
 // ===== Pins =====
 #define DIR_PIN_1 26
 #define DIR_PIN_2 23
-#define STEP_PIN_1 12
+#define STEP_PIN_1 18
 #define STEP_PIN_2 25
 #define ENABLE_PIN 33
 #define M0_PIN 14
@@ -72,45 +72,46 @@ void starte_kinematik_setup() {
   stepper2.setMinPulseWidth(5);
   stepper2.setAcceleration(beschleunigung);
   stepper2.setCurrentPosition(0);
-  t0 = millis();
 }
 
 // ===== Bewegung in Stillstandspositionen =====
-void fahre_stillstandspositionen_ab(int stepper, bool dir) {
+void fahre_stillstandspositionen_ab(int motor) {
   //float rotation = 2.0 / stillstands;
   float deg = 360.0 / stillstands;
-  float rotation = deg / 360.0;
+  float rotation = deg * 2 / 360.0;
   float winkelgeschwindigkeit = deg / dt;
 
 
-  if (stepper == 1) {
+  if (motor == 1) {
     stepper1.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit));
     for (int i = 0; i < stillstands; i++) {
     disableMotor();
     vTaskDelay(dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
     enableMotor();
-    digitalWrite(DIR_PIN_1, dir);
+    digitalWrite(DIR_PIN_1, LOW);
 
     float mikroSchritteInsgesamt = berechneMikroschritteProDrehung(rotation);
     long ziel = stepper1.currentPosition() + mikroSchritteInsgesamt;
     stepper1.moveTo(ziel);
     // Bewegung laufen lassen, ohne zu blockieren
     while (stepper1.distanceToGo() != 0) { stepper1.run(); }
+    stepper1.setCurrentPosition(0);
     }
   }
-  else {
+  else if (motor == 2){
     stepper2.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit));
     for (int i = 0; i < stillstands; i++) {
     disableMotor();
     vTaskDelay(dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
     enableMotor();
-    digitalWrite(DIR_PIN_2, dir);
+    digitalWrite(DIR_PIN_2, LOW);
 
     float mikroSchritteInsgesamt = berechneMikroschritteProDrehung(rotation);
     long ziel = stepper2.currentPosition() + mikroSchritteInsgesamt;
     stepper2.moveTo(ziel);
     // Bewegung laufen lassen, ohne zu blockieren
     while (stepper2.distanceToGo() != 0) { stepper2.run(); }
+    stepper2.setCurrentPosition(0);
     }
   }
 
@@ -139,6 +140,29 @@ void transitionZ(bool dir1, bool dir2) {
   // Richtung setzen
   digitalWrite(DIR_PIN_1, dir1);
   digitalWrite(DIR_PIN_2, dir2);
+
+  // Zielposition berechnen und Bewegung starten
+  long ziel1 = stepper1.currentPosition() + berechneMikroschritteProDrehung(rotation);
+  long ziel2 = stepper2.currentPosition() + berechneMikroschritteProDrehung(rotation);
+  stepper1.moveTo(ziel1);
+  stepper2.moveTo(ziel2);
+
+  // Bewegung ausführen, nicht blockierend
+  while (stepper1.distanceToGo() != 0 || stepper2.distanceToGo() != 0) {
+    stepper1.run();
+    stepper2.run();
+  }
+}
+
+void transition_cable() {
+  float rotation = 2.0;
+  // Geschwindigkeit für Übergangsbewegung setzen
+  stepper1.setMaxSpeed(transitionSpeed);
+  stepper2.setMaxSpeed(transitionSpeed);
+  
+  // Richtung setzen
+  digitalWrite(DIR_PIN_1, HIGH);
+  digitalWrite(DIR_PIN_2, HIGH);
 
   // Zielposition berechnen und Bewegung starten
   long ziel1 = stepper1.currentPosition() + berechneMikroschritteProDrehung(rotation);
@@ -233,22 +257,37 @@ void TaskReadIMU(void *pvParameters) {
   }
 }
 
+/*
+void TaskMotor(void *pvParameters) {
+  for (;;) {
+    if (start_calib) {
+      fahre_stillstandspositionen_ab(1);
+      vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+      
+  }
+}
+*/
+
+
 void TaskMotor(void *pvParameters) {
   for (;;) {
     if (start_calib) {
       read_imu = true;
       if (rotation_count % 2 == 0) {
         //Serial.print("rotation: "); Serial.println(rotation_count);
-        fahre_stillstandspositionen_ab(1, LOW);
+        fahre_stillstandspositionen_ab(1);
         vTaskDelay(10 / portTICK_PERIOD_MS);
         rotation_count++;
       }
       else {
         //Serial.print("rotation: "); Serial.println(rotation_count);
-        fahre_stillstandspositionen_ab(2, LOW);
+        fahre_stillstandspositionen_ab(2);
         read_imu = false;
         vTaskDelay(10 / portTICK_PERIOD_MS);
-        transitionZ(HIGH, HIGH);   // Z-Übergang
+        transition_cable();
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+        //transitionZ(HIGH, HIGH);   
         rotation_count++;
       }
 
@@ -274,10 +313,12 @@ void TaskMotor(void *pvParameters) {
   }
 }
 
+
+
 // ===== Setup =====
 void setup() {
   Serial.begin(115200);
-  delay(6000);
+  delay(10000);
   starte_kinematik_setup();
   Wire.begin(21, 22);
   Wire.setClock(400000);
