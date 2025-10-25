@@ -6,20 +6,22 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QShortcut
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QSizePolicy, QWidget
 from PyQt5.QtGui import QKeySequence
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPainter, QLinearGradient, QBrush, QColor
 from matplotlib.figure import Figure
 from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import csv
 import os, time, serial, pandas as pd
+from collections import deque
+
 
 # hinzufügen des Stylesheets
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from style.stylesheet import shadow_right_down, shadow_left_down, shadow_right_up, shadow_left_up
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from plot_gui.plot_utils import setup_plot_1, setup_plot_2 
+from plot_gui.plot_utils import LivePlot
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -64,16 +66,28 @@ class MainWindow(QMainWindow):
 
         # Funktionalitäten der Buttons
         self.pushButton_1.clicked.connect(self.calibration)
-        self.pushButton_2.clicked.connect(self.read_raw_data)
+        self.pushButton_2.clicked.connect(self.start_reading)
         self.pushButton_3.clicked.connect(self.stop_reading)
 
         #self.saveButton.clicked.connect(self.save)
         self.exitButton.clicked.connect(self.close)
 
+        """
+        # Zentrales Widget + Layout
+        self.central = QWidget()
+        self.setCentralWidget(self.central)
+        self.layout = QVBoxLayout(self.central)
+         # Plot-Bereich
+        self.plot_frame = QWidget()
+        self.layout.addWidget(self.plot_frame_1)
+        """
+
+        """
         # Plot plotten
         self.canvasPlot, self.axPlot, self.Plot = setup_plot_1(self.plot_frame_1, self)
         # Plot plotten
         self.canvasPlot, self.axPlot, self.Plot = setup_plot_2(self.plot_frame_2, self)
+        """
 
 
     def calibration(self):
@@ -113,48 +127,63 @@ class MainWindow(QMainWindow):
             
             # TODO Daten in Datei speichern
 
-    def read_raw_data(self):
-            
-            PORT = "COM3"
-            BAUD = 115200
-
-            ser = serial.Serial(PORT, BAUD, timeout=1)
-            time.sleep(2)
-
-            print("Fange an Daten zu sammeln...")
-            ser.write(b"Start Raw Read\n")
-
-            rows = []
-            t0 = time.time()
-
-            try:
-                while True:
-                    line = ser.readline().decode("utf-8", errors="ignore").strip()
-                    if not line:
-                        continue
-                    if "Calibration Done" in line:
-                        print("Kalibrierung beendet, speichere Daten...")
-                        break
-
-                    parts = line.split(",")
-                    if len(parts) == 6:
-                        ax, ay, az, gx, gy, gz = map(float, parts)
-                        rows.append([ax, ay, az, gx, gy, gz])
-                        print(parts)
-                        self.textausgabe_1.setText(f"ax = {ax}, ay= {ay}, az= {az}, gx = {gx}, gy = {gy}, gz = {gz}")
-                            
-            except KeyboardInterrupt:
-                print("Manuell gestoppt")
-
-    def stop_reading(self):
+    def start_reading(self):
         PORT = "COM3"
         BAUD = 115200
 
-        ser = serial.Serial(PORT, BAUD, timeout=1)
-        time.sleep(2)
-        ser.write(b"Stop Raw Read\n")
+         # Alte Canvas-Widgets aus dem Layout entfernen
+        layout = self.plot_frame_1.layout()
+        if layout:
+            while layout.count():
+                child = layout.takeAt(0)
+                if child.widget():
+                    child.widget().setParent(None)
+                    child.widget().deleteLater()
+
+        # --- Serielle Verbindung öffnen ---
+        try:
+            self.ser = serial.Serial(PORT, BAUD, timeout=1)
+            time.sleep(2)
+            self.ser.write(b"Start Raw Read\n")
+            print("✅ Verbindung geöffnet und Datenstream gestartet")
+        except serial.SerialException as e:
+            print("❌ Konnte COM-Port nicht öffnen:", e)
+            return
+
+        # --- LivePlot neu erzeugen ---
+        self.live_plot = LivePlot(self.plot_frame_1, self.ser)
+
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.read_one_line)
+        self.timer.start(10)
+
+    def read_one_line(self):
+
+        rows = []
+
+        line = self.ser.readline().decode("utf-8", errors="ignore").strip()
+        if not line:
+            return
+        if "Calibration Done" in line:
+            print("Kalibrierung beendet, speichere Daten...")
+
+        parts = line.split(",")
+        if len(parts) == 6:
+            ax, ay, az, gx, gy, gz = map(float, parts)
+            rows.append([ax, ay, az, gx, gy, gz])
+            print(parts)
+            self.textausgabe_1.setText(f"ax = {ax:.3f} m/s², ay = {ay:.3f} m/s², az = {az:.3f} m/s², gx = {gx:.3f} rad/s, gy = {gy:.3f} rad/s, gz = {gz:.3f} rad/s")
+            
+
+
+    def stop_reading(self):
+
+        self.ser.write(b"Stop Raw Read\n")
         print("Auslesen beendet!")
 
+        self.timer.stop()
+        self.live_plot.stop()
+        del self.live_plot
 
 def load_stylesheet(app):
     scriptDir = os.path.dirname(os.path.abspath(__file__))  # Pfad zur aktuellen .py-Datei
