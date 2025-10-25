@@ -1,7 +1,14 @@
+### Für Linux Qt5-Plugins setzen ###
+# Ausblenden, wenn nicht unter Linux gearbeitet wird
+import os, sys
+base = os.path.join(sys.prefix, "lib", "python3.12", "site-packages", "PyQt5", "Qt5")
+os.environ["LD_LIBRARY_PATH"] = os.path.join(base, "lib") + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(base, "plugins", "platforms")
+os.environ["QT_QPA_PLATFORM"] = "xcb"
+
+
 from PyQt5.QtWidgets import QMainWindow, QApplication, QMenu, QAction, QTableWidgetItem
-from PyQt5 import uic 
-import os
-import sys
+from PyQt5 import uic
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QShortcut
 from PyQt5.QtWidgets import QApplication, QVBoxLayout, QSizePolicy, QWidget
@@ -23,6 +30,8 @@ from style.stylesheet import shadow_right_down, shadow_left_down, shadow_right_u
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from plot_gui.plot_utils import LivePlot
 
+PORT = "/dev/ttyUSB0"
+BAUD = 115200
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
@@ -54,7 +63,7 @@ class MainWindow(QMainWindow):
         self.itm_logo.setAlignment(Qt.AlignCenter)
         self.itm_logo.setScaledContents(False)
 
-        
+
         # Schatten
         shadow_left_down(self.plot_frame_1)
         shadow_left_down(self.plot_frame_2)
@@ -93,11 +102,8 @@ class MainWindow(QMainWindow):
     def calibration(self):
             # Basis: Ordner, in dem das aktuelle Skript liegt
             BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-            DATA_DIR = os.path.join(BASE_DIR, "../../..", "data")  # ../data relativ zu src/
+            DATA_DIR = os.path.join(BASE_DIR, "../../../..", "data")  # ../data relativ zu src/
             CSV = os.path.join(DATA_DIR, "data.csv")
-
-            PORT = "COM3"
-            BAUD = 115200
 
             ser = serial.Serial(PORT, BAUD, timeout=1)
             time.sleep(2)
@@ -124,13 +130,15 @@ class MainWindow(QMainWindow):
                         print(parts)
             except KeyboardInterrupt:
                 print("Manuell gestoppt")
-            
-            # TODO Daten in Datei speichern
+
+            # Datei speichern
+            os.makedirs(DATA_DIR, exist_ok=True)
+            df = pd.DataFrame(rows, columns=["ax","ay","az","gx","gy","gz"])
+            df.to_csv(CSV, index=False)
+            print(f"{len(df)} Zeilen gespeichert in {CSV}")
+
 
     def start_reading(self):
-        PORT = "COM3"
-        BAUD = 115200
-
          # Alte Canvas-Widgets aus dem Layout entfernen
         layout = self.plot_frame_1.layout()
         if layout:
@@ -173,7 +181,7 @@ class MainWindow(QMainWindow):
             rows.append([ax, ay, az, gx, gy, gz])
             print(parts)
             self.textausgabe_1.setText(f"ax = {ax:.3f} m/s², ay = {ay:.3f} m/s², az = {az:.3f} m/s², gx = {gx:.3f} rad/s, gy = {gy:.3f} rad/s, gz = {gz:.3f} rad/s")
-            
+
 
 
     def stop_reading(self):
