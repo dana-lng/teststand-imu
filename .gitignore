@@ -1,3 +1,5 @@
 /software/python/venv/
 **/__pycache__
 **/tempCodeRunnerFile.py
+.pio
+.vscode
