@@ -12,7 +12,7 @@ volatile bool read_imu = false;
 volatile bool start_calib = false;
 int transitionSpeed = 10000;
 float dt = 8; // Default: 2s
-int stillstands = 7; // Default: 10
+int stillstands = 7; // Default: 10 // Eventuell Ändern auf 8 oder 6
 float degreeZ = 180; // Default: 45.0
 int rotation_count = 0;
 float beschleunigung = 10000.0;
@@ -94,7 +94,7 @@ void fahre_stillstandspositionen_ab(int motor) {
   //float rotation = 2.0 / stillstands;
   float deg = 360.0 / stillstands;
   float rotation = deg * 2 / 360.0;
-  float zufall = randomFloat(40.0, 30.0);
+  float zufall = randomFloat(40.0, 30.0);  // Ändern auf 40 und 10?
   float winkelgeschwindigkeit = deg * zufall / dt;
 
 
@@ -102,7 +102,7 @@ void fahre_stillstandspositionen_ab(int motor) {
     stepper1.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit));
     for (int i = 0; i < stillstands; i++) {
       disableMotor();
-      float zufall_dt = randomFloat(7.0, 4.0);
+      float zufall_dt = randomFloat(7.0, 4.0); // Ändern auf 8 und 2?
       vTaskDelay(zufall_dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
       enableMotor();
       digitalWrite(DIR_PIN_1, LOW);
@@ -120,7 +120,7 @@ void fahre_stillstandspositionen_ab(int motor) {
     stepper2.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit)/2);
     for (int i = 0; i < stillstands; i++) {
       disableMotor();
-      float zufall_dt = randomFloat(7.0, 4.0);
+      float zufall_dt = randomFloat(7.0, 4.0); // Ändern auf 8 und 2?
       vTaskDelay(zufall_dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
       enableMotor();
       digitalWrite(DIR_PIN_2, LOW);

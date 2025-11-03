@@ -23,6 +23,7 @@ import csv
 import os, time, serial, pandas as pd
 from collections import deque
 
+#/home/anh/Documents/teststand-imu/software/python/venv/bin/python /home/anh/Documents/teststand-imu/software/python/src/imu-calib/calibrate_real_imu.py --sampling_frequency=100 --file=data/imu1.log
 
 
 # hinzufügen des Stylesheets
