@@ -1,11 +1,12 @@
 ### Für Linux Qt5-Plugins setzen ###
 # Ausblenden, wenn nicht unter Linux gearbeitet wird
 import os, sys
+"""
 base = os.path.join(sys.prefix, "lib", "python3.12", "site-packages", "PyQt5", "Qt5")
 os.environ["LD_LIBRARY_PATH"] = os.path.join(base, "lib") + ":" + os.environ.get("LD_LIBRARY_PATH", "")
 os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = os.path.join(base, "plugins", "platforms")
 os.environ["QT_QPA_PLATFORM"] = "xcb"
-
+"""
 
 from PyQt5.QtWidgets import QMainWindow, QApplication, QMenu, QAction, QTableWidgetItem
 from PyQt5 import uic
@@ -21,6 +22,7 @@ from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import csv
 import os, time, serial, pandas as pd
 from collections import deque
+
 
 
 # hinzufügen des Stylesheets
