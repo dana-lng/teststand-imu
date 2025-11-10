@@ -12,7 +12,7 @@ volatile bool read_imu = false;
 volatile bool start_calib = false;
 int transitionSpeed = 10000;
 float dt = 8; // Default: 2s
-int stillstands = 7; // Default: 10 // Eventuell Ändern auf 8 oder 6
+int stillstands = 6; // Default: 10 // Eventuell Ändern auf 8 oder 6
 float degreeZ = 180; // Default: 45.0
 int rotation_count = 0;
 float beschleunigung = 10000.0;
@@ -89,23 +89,56 @@ float randomFloat(float minVal, float maxVal) {
   return minVal + ((float)random(0, 10000) / 10000.0f) * (maxVal - minVal);
 }
 
+// ===== Gleichverteilte Zufallslisten =====
+void init_random_profiles(float *zufall_dt_values, float *zufall_values, int n) {
+  float dt_min = 2.0, dt_max = 8.0;
+  float val_min = 10.0, val_max = 40.0;
+
+  // gleichmäßig verteilen
+  for (int i = 0; i < n; i++) {
+    zufall_dt_values[i] = dt_min + i * (dt_max - dt_min) / (n - 1);
+    zufall_values[i] = val_min + i * (val_max - val_min) / (n - 1);
+  }
+
+  // Fisher-Yates Shuffle
+  for (int i = n - 1; i > 0; i--) {
+    int j = random(0, i + 1);
+    float tmp = zufall_dt_values[i];
+    zufall_dt_values[i] = zufall_dt_values[j];
+    zufall_dt_values[j] = tmp;
+
+    tmp = zufall_values[i];
+    zufall_values[i] = zufall_values[j];
+    zufall_values[j] = tmp;
+  }
+}
+
 // ===== Bewegung in Stillstandspositionen =====
 void fahre_stillstandspositionen_ab(int motor) {
   //float rotation = 2.0 / stillstands;
   float deg = 360.0 / stillstands;
   float rotation = deg * 2 / 360.0;
-  float zufall = randomFloat(40.0, 30.0);  // Ändern auf 40 und 10?
-  float winkelgeschwindigkeit = deg * zufall / dt;
+
+  // Zufallslisten erzeugen
+  float zufall_dt_values[stillstands];
+  float zufall_values[stillstands];
+  init_random_profiles(zufall_dt_values, zufall_values, stillstands);
+
+
 
 
   if (motor == 1) {
-    stepper1.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit));
+
     for (int i = 0; i < stillstands; i++) {
       disableMotor();
-      float zufall_dt = randomFloat(7.0, 4.0); // Ändern auf 8 und 2?
+      float zufall_dt = zufall_dt_values[i];  // reproduzierbar & verteilt
       vTaskDelay(zufall_dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
       enableMotor();
       digitalWrite(DIR_PIN_1, LOW);
+
+      float zufall = zufall_values[i];        // reproduzierbar & verteilt
+      float winkelgeschwindigkeit = deg * zufall / dt;
+      stepper1.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit));
 
       float mikroSchritteInsgesamt = berechneMikroschritteProDrehung(rotation);
       long ziel = stepper1.currentPosition() + mikroSchritteInsgesamt;
@@ -117,13 +150,16 @@ void fahre_stillstandspositionen_ab(int motor) {
     }
   }
   else if (motor == 2){
-    stepper2.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit)/2);
+
     for (int i = 0; i < stillstands; i++) {
       disableMotor();
-      float zufall_dt = randomFloat(7.0, 4.0); // Ändern auf 8 und 2?
+      float zufall_dt = randomFloat(8.0, 2.0); // Ändern auf 8 und 2?
       vTaskDelay(zufall_dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
       enableMotor();
       digitalWrite(DIR_PIN_2, LOW);
+      float zufall = zufall_values[i];        // reproduzierbar & verteilt
+      float winkelgeschwindigkeit = deg * zufall / dt;
+      stepper2.setMaxSpeed(berechneMikroschritteProSekunde(winkelgeschwindigkeit)/2);
 
       float mikroSchritteInsgesamt = berechneMikroschritteProDrehung(rotation);
       long ziel = stepper2.currentPosition() + mikroSchritteInsgesamt /2;
@@ -338,6 +374,7 @@ void TaskMotor(void *pvParameters) {
         transitionZ();
         rotation_count++;
       }
+      //randomSeed(42 + rotation_count);
 
       if (rotation_count >= (int)(360.0 * 2/ degreeZ)) {
         read_imu = true;
@@ -367,7 +404,7 @@ void TaskMotor(void *pvParameters) {
 void setup() {
   delay(10000);
   Serial.begin(115200);
-  randomSeed(analogRead(34)); // z. B. unverbundener analoger Pin
+  randomSeed(42);
   starte_kinematik_setup();
   Wire.begin(21, 22);
   Wire.setClock(400000);

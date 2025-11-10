@@ -6,10 +6,15 @@ import matplotlib.pyplot as plt
 PORT = "/dev/ttyUSB0"
 BAUD = 115200
 
-# === Kalibrierparameter (aus deinem Log) ===
-acc_params = np.array([0.0042, 0.0040, 0.0211, 0.0016, -0.0001, 0.0067, 1.0793, -0.0730, 0.2950])
-gyr_params = np.array([-0.0025, -0.0112, 0.0770, -0.1100, 0.0078, -0.0027,
-                       -0.0287, 0.0276, -0.0481, -0.0017, 0.0190, 0.0054])
+# === Kalibrierparameter (aktualisiert) ===
+acc_params = np.array([0.0044, 0.0038, 0.0212,
+                       0.0017, 0.0001, 0.0065,
+                       1.0825, -0.0748, 0.2896])
+
+gyr_params = np.array([-0.0041, -0.0071, 0.0120,
+                       -0.0727, 0.0065, -0.0117,
+                       -0.0273, 0.0177, -0.0335,
+                       -0.0013, 0.0168, 0.0057])
 
 # === Hilfsfunktionen ===
 def upper_tri_matrix(sx, sy, sz, noxy, noxz, noyz):
@@ -70,7 +75,12 @@ try:
         if len(parts) != 6:
             continue
 
-        ax, ay, az, gx, gy, gz = map(float, parts)
+        try:
+            ax, ay, az, gx, gy, gz = map(float, parts)
+        except ValueError:
+            # Wenn z. B. "-0.02710.28302" oder Nullbytes auftauchen
+            print(f"⚠️  Ungültige Zeile übersprungen: {line!r}")
+            continue
         acc = np.array([ax, ay, az])
         gyr = np.array([gx, gy, gz])
 
