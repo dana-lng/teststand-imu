@@ -1,0 +1,53 @@
+QMainWindow 
+{
+    background-color: rgba(52, 49, 61, 0.973);
+}
+
+QPushButton
+{
+    background-color: rgba(78, 83, 92, 0.973);
+    color: rgb(255, 255, 255);
+    border-radius: 15px;
+    padding: 8px 16px;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    font-size: 19px;
+    font-weight: normal;
+
+}
+
+QPushButton:hover
+{
+    background-color: rgba(109, 100, 117, 0.973);
+
+}
+
+QPushButton:pressed
+{
+    background-color: rgba(81, 74, 87, 0.973);
+
+}
+
+#plot_frame_1, #plot_frame_2
+{
+    border-radius: 15px;
+
+}
+
+#textausgabe_1
+{
+    color: #363636;
+    font-size: 16px;
+    font-family: Consolas;
+    border: 1px solid #333;
+    padding: 6px;
+    border-radius: 8px;
+}
+
+#header
+{
+    color: white;
+    font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+    font-size: 40px;
+    font-weight: bold;
+}
+
