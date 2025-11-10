@@ -47,7 +47,7 @@ Each calibration result was obtained through a series of standstill measurements
 ---
 
 ## Setting Up the Test Stand
-
+Eventually you have to set the correct COM port in the [main GUI](software/python/src/gui/main.py) before running it.
 ### Prerequisites
 ```bash
 # Clone the repository
@@ -62,6 +62,20 @@ source software/python/venv/bin/activate   # (Linux/macOS)
 # Install required dependencies
 pip install -r software/python/requirements.txt
 ```
+
+### Compiling and Uploading Firmware to ESP32
+The software C++ File for the ESP32 is located under: [cpp folder](software/cpp/)
+To build and upload the firmware, you need PlatformIO installed in your IDE (e.g., VSCode).
+
+```bash
+# Build and upload the firmware to the ESP32
+pio run --target upload
+
+# (Optional) Open the serial monitor
+pio device monitor
+```
+
+Please note that it takes a few seconds for the ESP32 to boot up after uploading the firmware. (For me its around 30 seconds)
 
 ### Running the Graphical Interface
 ```bash
