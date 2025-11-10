@@ -17,7 +17,13 @@ The Calibration is based on the method proposed in the following paper:
 ---
 
 ## Mechanical Design and Kinematics
+Here you can see the Mechanical Setup in real life and in Solidworks.
+<p align="left">
+  <img src="docs/imu_teststand_reallife.png" width="33.7%">
+  <img src="docs/imu_teststand_solidworks.png" width="45%">
+</p>
 Below are the differential gear animations showing the independent Z-axis rotation and combined X/Z-axis motion.
+
 <b>Z-Axis Rotation</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>X/Y-Axis Rotation</b><br>
 <img src="./docs/rotation_z.gif" width="400"> <img src="./docs/rotation_xz.gif" width="400">
 
