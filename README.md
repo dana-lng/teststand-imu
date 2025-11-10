@@ -43,7 +43,6 @@ Each calibration result was obtained through a series of standstill measurements
 
 ### Live Validation
 ![Live Validation](/docs/live_validation.gif)
-
 ---
 
 ## Setting Up the Test Stand
