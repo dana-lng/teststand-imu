@@ -1,28 +1,23 @@
-# IMU Calibration Test Stand with Differential Gear System
+# Two-Axis IMU Calibration Test Stand with Differential Gear System
+An open-source, dual-axis calibration platform for IMU sensors (e.g., MPU6050), featuring a fully 3D-printed differential gear drive and automated motion control for precise in-situ calibration.
 
 ## Project Overview
 
 This project presents the design and function of a **two-axis IMU calibration test stand**, developed to calibrate inertial measurement units (IMUs) such as the [MPU6050](https://invensense.tdk.com/products/motion-tracking/6-axis/mpu-6050/). The test stand enables controlled, repeatable motion for precise sensor calibration.
 
-All mechanical parts are **3D printed**, and motion is driven by **NEMA 17 stepper motors** in combination with an **HTD timing belt system**. The movement is realized through a **differential gear mechanism**, providing two degrees of freedom (DoF).
+All mechanical parts are **3D printed**, and motion is driven by **NEMA 17 stepper motors** in combination with an **HTD belt system**. The movement is realized through a **differential gear mechanism**, providing two degrees of freedom (DoF).
+
+The Calibration is based on the method proposed in the following paper:
+> **A. Mikov, S. Reginya, and A. Moschevikin**,
+> *"In-situ Gyroscope Calibration Based on Accelerometer Data,"*
+> 27th Saint Petersburg International Conference on Integrated Navigation Systems (ICINS), IEEE, 2020.
+> [[IEEE paaper]](https://ieeexplore.ieee.org/document/9133804) and Github Repository [[imu-calib]](https://github.com/mikoff/imu-calib).
+
 
 ---
 
-## ⚙️ System Characteristics
-
-- 🎯 **Purpose**: Accurate calibration of IMUs
-- 🧩 **Mechanics**: Differential gear-driven motion
-- 🖨️ Manufacturing: Fully 3D printed components
-- 🔄 **Degrees of Freedom**:  
-  - **Z-axis**: Independently rotatable  
-  - **X and Y axes**: Coupled motion, dependent on Z-axis rotation
-- 🚀 **Actuation**: NEMA 17 stepper motors with HTD belt drive
-- 🧠 **Controller**: Arduino Nano for motor control and signal processing
-
----
-
-## 🖼️ Visualizations
-
+## Mechanical Design and Kinematics
+Below are the differential gear animations showing the independent Z-axis rotation and combined X/Z-axis motion.
 <b>Z-Axis Rotation</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>X/Y-Axis Rotation</b><br>
 <img src="./docs/rotation_z.gif" width="400"> <img src="./docs/rotation_xz.gif" width="400">
 
@@ -32,81 +27,98 @@ All mechanical parts are **3D printed**, and motion is driven by **NEMA 17 stepp
 
 ---
 
-## 🛠️ Calibration in Real Life (HAS TO BE ADDED!!!)
-
-<p align="center">
-  <img src="./docs/calibration_real_life.gif" width="1920">
-</p>
-
-This animation demonstrates the real-life calibration process, where the IMU undergoes controlled multi-axis rotations.  
-It shows how the test stand executes repeatable motion sequences to allow for accurate sensor calibration.
-
-
----
 ## Wiring Diagram
-
-<p align="center">
-  <img src="./docs/wiring_diagram.png" width="1920">
-</p>
-
-The wiring diagram shows the connection between the Arduino Nano, stepper motor drivers (A4988/DRV8825), NEMA 17 stepper motors, the MPU6050 sensor, and power supply.
+The wiring connects two NEMA 17 stepper drivers, an ESP32 microcontroller, and the MPU6050 IMU sensor.
+![Wiring Diagram Explanation](/docs/wiring_diagram.png)
 
 ---
 
-## 📊 Sensor Data Visualization
+## Validations
+Each calibration result was obtained through a series of standstill measurements and controlled rotations performed by the test stand.
+### Accelerometer Validation
+![Accelerometer Validation](/docs/acc_calibration_results.png)
 
-To validate the calibration process, both **accelerometer** and **gyroscope** signals were recorded before and after calibration.  
-The plots show the comparison between **raw data**, **calibrated data**, and the **expected values** during controlled rotations.  
+### Gyroscope Validation
+![Gyroscope Validation](/docs/gyro_calibration_results.png)
 
-### 📈 Accelerometer Calibration
-<p align="center">
-  <img src="./docs/accelerometer_calibration_example1.png" width="1000">
-</p>
-
-The accelerometer plots illustrate the three axes (**ax, ay, az**).  
-- 🟠 *Raw data* (uncalibrated)  
-- 🟢 *Calibrated data* (after bias and scale factor correction)  
-- 🔴 *Expected values* (reference for controlled rotation)  
-
-Calibration significantly reduces **bias** and aligns the output closer to the expected reference.  
+### Live Validation
+![Live Validation](/docs/live_validation.gif)
 
 ---
 
-### 📈 Gyroscope Calibration
-<p align="center">
-  <img src="./docs/gyroscope_calibration_example1.png" width="1000">
-</p>
+## Setting Up the Test Stand
 
-The gyroscope plots illustrate the three axes (**gx, gy, gz**).  
-- 🟠 *Raw data* (uncalibrated)  
-- 🟢 *Calibrated data* (after correction)  
-- 🔴 *Expected values* (reference for applied rotation)  
+### Prerequisites
+```bash
+# Clone the repository
+git clone https://github.com/anh-lxn/teststand-imu.git
+cd teststand-imu
 
-Calibration minimizes **offset drift** and ensures a more accurate representation of angular velocity.  
+# Create and activate a virtual environment
+python -m venv software/python/venv
+source software/python/venv/bin/activate   # (Linux/macOS)
+# .\software\python\venv\Scripts\activate  # (Windows)
+
+# Install required dependencies
+pip install -r software/python/requirements.txt
+```
+
+### Running the Graphical Interface
+```bash
+# Run the main GUI application
+python software/python/src/gui/main.py
+```
+![MAIN GUI](/docs/gui.png)
+
+Buttons:
+- **Start Calibration**: The Imu will collect Data in synchronization with the Test Stand Movement. Then it will perform the Calibration and show the Results and save them in the results folder.
+- **Read raw data**: The Imu will send raw data to the GUI for live visualization without performing calibration.
+- **Stop reading**: Stops any ongoing data reading from the Imu.
+
+### Running Validation Scripts
+```bash
+# Run accelerometer validation
+python software/python/src/accel_validation.py
+```
+
+```bash
+# Run gyroscope standstill validation
+python software/python/src/gyro_standstill_validation.py
+```
+```bash
+# Run live validation
+python software/python/src/live_validation.py
+```
+---
+
+
+## Authors and Contributors
+
+- **[Anh Le Xuan](https://www.anhlexuan.com)** – Student Assistant
+  Designed, built, and programmed the complete IMU test stand, including 3D modeling, electronics, firmware, and software.
+
+- **[Dana Lenzig](https://www.linkedin.com/in/dana-lenzig-61a04830a)** – Student Assistant
+  Developed the graphical user interface (GUI) for live visualization and calibration control.
+
+- **Benjamin Waschilewski** – Research Associate and Project Supervisor
+- **Hung Le Xuan** – Head of Research Group
+
+*Institute of Textile Machinery and High Performance Material Technology (ITM), TU Dresden*
+
+### Citation
+
+If you use this project or parts of it, please give credit to the following authors:
+
+> **Anh Le Xuan**, **Dana Lenzig**, **Benjamin Waschilewski**, **Hung Le Xuan**
+> *Institute of Textile Machinery and High Performance Material Technology (ITM), TU Dresden*
+>
+> Based on the calibration method described in:
+> *Mikov, A., Reginya, S., & Moschevikin, A. (2020). In-situ Gyroscope Calibration Based on Accelerometer Data.
+> 2020 27th Saint Petersburg International Conference on Integrated Navigation Systems (ICINS), IEEE.*
+
 
 ---
 
-✅ These visualizations confirm that the test stand enables **reliable calibration** by applying repeatable motion sequences and comparing sensor output to ground truth.
-
-
-## 🧠 Motivation
-
-Reliable IMU data is only possible when the sensors are properly **calibrated**. This test stand allows for controlled motion sequences, helping to identify and compensate for common issues such as drift, offset, and axis misalignment.
-
----
-
-## 🚀 Project Status & Outlook
-
-✅ The hardware and mechanics of the calibration test stand are complete.
-🔜 Future work will focus on:
-
-- 📈 Further data processing
-- 💻 Graphical user interface (GUI) for easy operation
-
----
-
-## 👨‍🔧 Author
-
-- Anh Le Xuan – Student Assistant (SHK), responsible for mechanical design and implementation  
-- Benjamin Waschilewski – Research Associate and Supervisor  
-- Institute of Textile Machinery and High Performance Material Technology (ITM), TU Dresden
+## License
+This project is released under the MIT License.
+See [LICENSE](./LICENSE) for details.

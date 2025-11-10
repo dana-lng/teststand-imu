@@ -85,10 +85,6 @@ void enableMotor() {
   motor_enabled = true;;
 }
 
-float randomFloat(float minVal, float maxVal) {
-  return minVal + ((float)random(0, 10000) / 10000.0f) * (maxVal - minVal);
-}
-
 // ===== Gleichverteilte Zufallslisten =====
 void init_random_profiles(float *zufall_dt_values, float *zufall_values, int n) {
   float dt_min = 2.0, dt_max = 8.0;
@@ -124,9 +120,6 @@ void fahre_stillstandspositionen_ab(int motor) {
   float zufall_values[stillstands];
   init_random_profiles(zufall_dt_values, zufall_values, stillstands);
 
-
-
-
   if (motor == 1) {
 
     for (int i = 0; i < stillstands; i++) {
@@ -153,7 +146,7 @@ void fahre_stillstandspositionen_ab(int motor) {
 
     for (int i = 0; i < stillstands; i++) {
       disableMotor();
-      float zufall_dt = randomFloat(8.0, 2.0); // Ändern auf 8 und 2?
+      float zufall_dt = zufall_dt_values[i];  // reproduzierbar & verteilt; // Ändern auf 8 und 2?
       vTaskDelay(zufall_dt * 1000 / portTICK_PERIOD_MS); // Stillstandzeit
       enableMotor();
       digitalWrite(DIR_PIN_2, LOW);
@@ -404,7 +397,7 @@ void TaskMotor(void *pvParameters) {
 void setup() {
   delay(10000);
   Serial.begin(115200);
-  randomSeed(42);
+  randomSeed(40);
   starte_kinematik_setup();
   Wire.begin(21, 22);
   Wire.setClock(400000);

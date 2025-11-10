@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
             self.textausgabe_1.setText("Calibration Started and Collecting Data ...")
             QApplication.processEvents() # Update GUI
 
-            """
+
             ser = serial.Serial(PORT, BAUD, timeout=1)
             time.sleep(2)
 
@@ -120,7 +120,7 @@ class MainWindow(QMainWindow):
             df = pd.DataFrame(rows, columns=["ax","ay","az","gx","gy","gz"])
             df.to_csv(CSV, index=False)
             print(f"{len(df)} Zeilen gespeichert in {CSV}")
-            """
+
             # Start Calibration Script
             calibrate_file = os.path.join(os.path.dirname(__file__), "..", "imu-calib", "calibrate_real_imu.py")
             calibrate_file = os.path.abspath(calibrate_file)
