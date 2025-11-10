@@ -20,11 +20,8 @@ from matplotlib.figure import Figure
 from matplotlib.animation import FuncAnimation
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 import csv
-import os, time, serial, pandas as pd
+import os, subprocess, time, serial, pandas as pd
 from collections import deque
-
-#/home/anh/Documents/teststand-imu/software/python/venv/bin/python /home/anh/Documents/teststand-imu/software/python/src/imu-calib/calibrate_real_imu.py --sampling_frequency=100 --file=data/imu1.log
-
 
 # hinzufügen des Stylesheets
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -35,19 +32,19 @@ from plot_gui.plot_utils import LivePlot
 
 PORT = "/dev/ttyUSB0"
 BAUD = 115200
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
 
         # Pfad zur UI ermitteln
         scriptDir = os.path.dirname(os.path.abspath(__file__))
-        uiPath = os.path.join(scriptDir, "untitled.ui")
+        uiPath = os.path.join(scriptDir, "main.ui")
 
         # UI laden
         uic.loadUi(uiPath, self)
 
         self.textausgabe_1.setAlignment(Qt.AlignCenter)
-
 
         #Logos laden
         scriptDir = os.path.dirname(os.path.abspath(__file__))
@@ -80,26 +77,7 @@ class MainWindow(QMainWindow):
         self.pushButton_1.clicked.connect(self.calibration)
         self.pushButton_2.clicked.connect(self.start_reading)
         self.pushButton_3.clicked.connect(self.stop_reading)
-
-        #self.saveButton.clicked.connect(self.save)
-        self.exitButton.clicked.connect(self.close)
-
-        """
-        # Zentrales Widget + Layout
-        self.central = QWidget()
-        self.setCentralWidget(self.central)
-        self.layout = QVBoxLayout(self.central)
-         # Plot-Bereich
-        self.plot_frame = QWidget()
-        self.layout.addWidget(self.plot_frame_1)
-        """
-
-        """
-        # Plot plotten
-        self.canvasPlot, self.axPlot, self.Plot = setup_plot_1(self.plot_frame_1, self)
-        # Plot plotten
-        self.canvasPlot, self.axPlot, self.Plot = setup_plot_2(self.plot_frame_2, self)
-        """
+        self.exitButton.clicked.connect(lambda: (self.stop_reading(), self.close()))
 
 
     def calibration(self):
@@ -107,15 +85,18 @@ class MainWindow(QMainWindow):
             BASE_DIR = os.path.dirname(os.path.abspath(__file__))
             DATA_DIR = os.path.join(BASE_DIR, "../../../..", "data")  # ../data relativ zu src/
             CSV = os.path.join(DATA_DIR, "data.csv")
+            self.textausgabe_1.setText("Calibration Started and Collecting Data ...")
+            QApplication.processEvents() # Update GUI
 
+            """
             ser = serial.Serial(PORT, BAUD, timeout=1)
             time.sleep(2)
 
             print("Fange an Daten zu sammeln...")
+
             ser.write(b"Start Calibration\n")
 
             rows = []
-            t0 = time.time()
 
             try:
                 while True:
@@ -139,19 +120,30 @@ class MainWindow(QMainWindow):
             df = pd.DataFrame(rows, columns=["ax","ay","az","gx","gy","gz"])
             df.to_csv(CSV, index=False)
             print(f"{len(df)} Zeilen gespeichert in {CSV}")
+            """
+            # Start Calibration Script
+            calibrate_file = os.path.join(os.path.dirname(__file__), "..", "imu-calib", "calibrate_real_imu.py")
+            calibrate_file = os.path.abspath(calibrate_file)
+            self.textausgabe_1.setText("Calculating Parameters ...")
+            QApplication.processEvents() # Update GUI
+            subprocess.run([sys.executable, calibrate_file, "--sampling_frequency=100"])
+            self.textausgabe_1.setText("Calibration Done. Files are saved.")
+            QApplication.processEvents() # Update GUI
+
 
 
     def start_reading(self):
-         # Alte Canvas-Widgets aus dem Layout entfernen
-        layout = self.plot_frame_1.layout()
-        if layout:
-            while layout.count():
-                child = layout.takeAt(0)
-                if child.widget():
-                    child.widget().setParent(None)
-                    child.widget().deleteLater()
+        # Alte Canvas in beiden Frames entfernen
+        for frame in (self.plot_frame_1, self.plot_frame_2):
+            layout = frame.layout()
+            if layout:
+                while layout.count():
+                    child = layout.takeAt(0)
+                    if child.widget():
+                        child.widget().setParent(None)
+                        child.widget().deleteLater()
 
-        # --- Serielle Verbindung öffnen ---
+        # Serielle Verbindung öffnen
         try:
             self.ser = serial.Serial(PORT, BAUD, timeout=1)
             time.sleep(2)
@@ -161,12 +153,32 @@ class MainWindow(QMainWindow):
             print("❌ Konnte COM-Port nicht öffnen:", e)
             return
 
-        # --- LivePlot neu erzeugen ---
-        self.live_plot = LivePlot(self.plot_frame_1, self.ser)
+        # --- LivePlot für Acc ---
+        self.live_plot_acc = LivePlot(
+            target_widget=self.plot_frame_1,
+            ser=self.ser,
+            indices=(0, 1, 2),
+            labels=("ax", "ay", "az"),
+            title = "Accelerometer",
+            ylabel="Acceleration [m/s²]"
+        )
 
+        # --- LivePlot für Gyro ---
+        self.live_plot_gyro = LivePlot(
+            target_widget=self.plot_frame_2,
+            ser=self.ser,
+            indices=(3, 4, 5),
+            labels=("gx", "gy", "gz"),
+            ylabel="Angular velocity [rad/s]",
+            title = "Gyroscope",
+            color=("tab:red", "tab:purple", "tab:gray")
+        )
+
+        # Timer für Textanzeige
         self.timer = QTimer()
         self.timer.timeout.connect(self.read_one_line)
         self.timer.start(10)
+
 
     def read_one_line(self):
 
@@ -180,21 +192,28 @@ class MainWindow(QMainWindow):
 
         parts = line.split(",")
         if len(parts) == 6:
-            ax, ay, az, gx, gy, gz = map(float, parts)
+            try:
+                ax, ay, az, gx, gy, gz = map(float, parts)
+            except ValueError:
+                return
             rows.append([ax, ay, az, gx, gy, gz])
-            print(parts)
+            #print(parts)
             self.textausgabe_1.setText(f"ax = {ax:.3f} m/s², ay = {ay:.3f} m/s², az = {az:.3f} m/s², gx = {gx:.3f} rad/s, gy = {gy:.3f} rad/s, gz = {gz:.3f} rad/s")
 
 
 
     def stop_reading(self):
-
         self.ser.write(b"Stop Raw Read\n")
         print("Auslesen beendet!")
-
         self.timer.stop()
-        self.live_plot.stop()
-        del self.live_plot
+
+        if hasattr(self, "live_plot_acc"):
+            self.live_plot_acc.stop()
+        if hasattr(self, "live_plot_gyro"):
+            self.live_plot_gyro.stop()
+
+        if self.ser.is_open:
+            self.ser.close()
 
 def load_stylesheet(app):
     scriptDir = os.path.dirname(os.path.abspath(__file__))  # Pfad zur aktuellen .py-Datei
